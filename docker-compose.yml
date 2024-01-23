@@ -1,0 +1,44 @@
+version: '3.9'
+services:
+  web:
+    build: .
+    command: bash -c "python manage.py makemigrations && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+      - redis
+  db:
+    image: postgres:13
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - "POSTGRES_HOST_AUTH_METHOD=trust"
+  redis:
+    image: redis:alpine
+    container_name: fda_1
+    restart: unless-stopped
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - redis_data:/bitnami/redis/data:rw
+  celery:
+    build: .
+    command: bash -c "celery -A FDA app worker -l info"
+    volumes:
+      - .:/usr/src/app/
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - WAIT_HOSTS=redis:6379
+      - WAIT_HOSTS_TIMEOUT=240
+    depends_on:
+      - db
+      - redis
+      - web
+volumes:
+  postgres_data:
+  redis_data:
+
